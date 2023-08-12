@@ -1,0 +1,7 @@
+[package]
+name = "kare"
+description = "Keyboard and mouse Automation and Replay Engine"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]

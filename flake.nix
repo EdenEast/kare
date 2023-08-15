@@ -81,7 +81,7 @@
         };
 
         apps = {
-          tuxmux = flake-utils.lib.mkApp {
+          kare = flake-utils.lib.mkApp {
             dev = kare;
           };
           default = apps.kare;
@@ -93,7 +93,7 @@
         };
 
         devShells.default = pkgs.mkShell {
-          name = "tuxmux";
+          name = "kare";
           inputsFrom = builtins.attrValues checks;
           nativeBuildInputs = with pkgs; [
             rustToolchain

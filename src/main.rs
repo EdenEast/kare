@@ -36,77 +36,112 @@ impl<T: 'static + Clone + Send + Sync> Broadcast<T> {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum KeyEvent {
     Pressed(Keycode),
     Released(Keycode),
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum MouseEvent {
     Move(MousePosition),
     Pressed(MouseButton),
     Released(MouseButton),
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum Event {
     Key(KeyEvent),
     Mouse(MouseEvent),
+    Play,
+    Pause,
+    Record,
 }
 
-fn listener_thread(sender: Sender<Event>, terminate: Receiver<()>) -> JoinHandle<()> {
-    std::thread::spawn(move || {
-        let device_state = DeviceState::new();
+#[derive(Debug, Clone, Copy)]
+pub struct KeyBinding {
+    pub record: Keycode,
+    pub play: Keycode,
+    pub pause: Keycode,
+}
 
-        let tx = sender.clone();
-        let guard_kd = device_state.on_key_down(move |key| {
-            tx.send(Event::Key(KeyEvent::Pressed(*key)))
-                .expect("failed to send key pressed event");
-        });
+impl Default for KeyBinding {
+    fn default() -> Self {
+        Self {
+            record: Keycode::F9,
+            play: Keycode::F10,
+            pause: Keycode::F11,
+        }
+    }
+}
 
-        let tx = sender.clone();
-        let guard_ku = device_state.on_key_up(move |key| {
-            tx.send(Event::Key(KeyEvent::Released(*key)))
-                .expect("failed to send key pressed event");
-        });
-
-        let tx = sender.clone();
-        let guard_mm = device_state.on_mouse_move(move |pos| {
-            tx.send(Event::Mouse(MouseEvent::Move(*pos)))
-                .expect("failed to send mouse move event");
-        });
-
-        let tx = sender.clone();
-        let guard_md = device_state.on_mouse_down(move |button| {
-            tx.send(Event::Mouse(MouseEvent::Pressed(*button)))
-                .expect("failed to send mouse button down event");
-        });
-
-        let tx = sender;
-        let guard_mu = device_state.on_mouse_up(move |button| {
-            tx.send(Event::Mouse(MouseEvent::Released(*button)))
-                .expect("failed to send mouse button up event");
-        });
-
-        // Block in terminate signal
-        let _ = terminate.recv();
-        drop(guard_kd);
-        drop(guard_ku);
-        drop(guard_mm);
-        drop(guard_md);
-        drop(guard_mu);
-    })
+impl KeyBinding {
+    pub fn event_from_key(&self, key: &Keycode) -> Option<Event> {
+        if key == &self.record {
+            Some(Event::Record)
+        } else if key == &self.play {
+            Some(Event::Play)
+        } else if key == &self.pause {
+            Some(Event::Pause)
+        } else {
+            None
+        }
+    }
 }
 
 fn main() {
     let (tx, rx) = crossbeam_channel::unbounded();
-    let mut cast = Broadcast::new();
-    listener_thread(tx, cast.subscribe());
+    let bindings = KeyBinding::default();
+
+    let device_state = DeviceState::new();
+
+    let sender = tx.clone();
+    let guard_kd = device_state.on_key_down(move |key| {
+        let event = bindings
+            .event_from_key(key)
+            .unwrap_or(Event::Key(KeyEvent::Pressed(*key)));
+
+        sender
+            .send(event)
+            .expect("failed to send key pressed event");
+    });
+
+    let sender = tx.clone();
+    let guard_ku = device_state.on_key_up(move |key| {
+        if bindings.event_from_key(key).is_none() {
+            sender
+                .send(Event::Key(KeyEvent::Released(*key)))
+                .expect("failed to send key pressed event");
+        }
+    });
+
+    let sender = tx.clone();
+    let guard_mm = device_state.on_mouse_move(move |pos| {
+        sender
+            .send(Event::Mouse(MouseEvent::Move(*pos)))
+            .expect("failed to send mouse move event");
+    });
+
+    let sender = tx.clone();
+    let guard_md = device_state.on_mouse_down(move |button| {
+        sender
+            .send(Event::Mouse(MouseEvent::Pressed(*button)))
+            .expect("failed to send mouse button down event");
+    });
+
+    let sender = tx;
+    let guard_mu = device_state.on_mouse_up(move |button| {
+        sender
+            .send(Event::Mouse(MouseEvent::Released(*button)))
+            .expect("failed to send mouse button up event");
+    });
 
     while let Ok(event) = rx.recv() {
         match event {
             Event::Key(event) => match event {
                 KeyEvent::Pressed(key) => {
                     if key == Keycode::Delete {
-                        cast.send(());
+                        break;
                     }
                     println!("Key pressed: {:?}", key);
                 }
@@ -125,8 +160,23 @@ fn main() {
                     println!("mouse released: {:?}", button);
                 }
             },
+            Event::Play => {
+                println!("Play event");
+            }
+            Event::Pause => {
+                println!("Pause event");
+            }
+            Event::Record => {
+                println!("Record event");
+            }
         }
     }
+
+    drop(guard_kd);
+    drop(guard_ku);
+    drop(guard_mm);
+    drop(guard_md);
+    drop(guard_mu);
 }
 
 // fn main() {

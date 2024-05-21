@@ -1,11 +1,6 @@
-[package]
-name = "kare"
-description = "Keyboard and mouse Automation and Replay Engine"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-clap = { version = "4.3.21", features = ["cargo", "derive"] }
-device_query = "1.1.3"
-eframe = "0.22.0"
-eyre = "0.6.8"
+[workspace]
+members = [
+  "crates/libkare",
+  "crates/kare",
+  "crates/gkare",
+]

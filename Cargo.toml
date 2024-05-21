@@ -5,3 +5,6 @@ members = [
   "crates/kare",
   "crates/gkare",
 ]
+
+[workspace.package]
+version = "0.1.0"
